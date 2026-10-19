@@ -37,7 +37,7 @@ def atomic(path: Path, data: bytes) -> None:
     try:
         try:
             os.fchmod(fd, 0o600)
-        except OSError:
+        except (AttributeError, OSError):
             pass
         with os.fdopen(fd, "wb") as f:
             f.write(data)
