@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cooooost"
+version = "1.0.0"
+description = "Local-first lossless context archive, conservative AI response cache, and session recovery"
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["agent-skills", "context", "prompt-caching", "claude-code", "codex"]
+
+[project.scripts]
+cooooost = "cooooost.cli:main"
+
+[tool.setuptools]
+packages = ["cooooost"]
+
+[tool.setuptools.package-data]
+cooooost = ["SKILL.md"]

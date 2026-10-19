@@ -1,42 +1,27 @@
-# Cache 80 — design and integration contract
+# Cache 80: accuracy contract
 
-Cache 80 is a target optimization profile, not a guaranteed 80% reduction.
+Cache 80 groups **three independent optimizations**:
 
-## What is implemented
-- Exact-match request caching with SHA-256 keys incorporating provider, model, system prompt, messages, tools, parameters, and namespace.
-- TTL and integrity validation.
-- Atomic cache writes.
-- Lossless context chunk manifest and reconstruction verification.
+1. **Native prompt-prefix reuse**: maximize naturally repeated initial message and tool-definition prefixes. The provider decides cache effectiveness; cached input tokens may receive reduced API pricing but still count toward usage limits.
+2. **Exact response replay**: only with `X-Cooooost-Cache: replay`, `temperature: 0`, exact eligible JSON, same credential, namespace, provider and endpoint. Ignores none of the original request fields. TTL default one hour. This avoids a fresh model call and so may save both input and output API tokens, at the cost of using an old reply. It is never appropriate for changing information or actions.
+3. **Lossless local archives + scoped retrieval**: original source remains recoverable; selecting relevant chunks may reduce prompt size, but incomplete relevance selection must always be disclosed and verified on demand.
 
-## Critical correctness rules
-- Never reuse a response for a changed input, tool schema, model or generation parameter.
-- Do not cache nondeterministic or externally changing operations (live search, purchases, destructive operations, personal data) unless the caller explicitly chooses a valid freshness policy.
-- Never send a summary in place of necessary source data without retrieval access and verification.
-- Never claim that a context manifest itself reduces model tokens: savings occur only if the agent sends shorter verified relevant content or provider-supported cached prefixes.
-- Exact-cache hits avoid model calls; misses incur normal costs.
-- Provider-side prompt caching is separate and requires provider integration and usage telemetry.
-- The same prompt with temperature > 0 may produce different valid answers; exact response reuse must be an explicit caller choice.
+## Cost measurements
 
-## Python integration
+- `observed_input_tokens`: upstream-reported input usage for successful non-streamed JSON replies.
+- `observed_output_tokens`: upstream-reported output usage.
+- `provider_cached_input_tokens`: upstream-reported cached input subset; not all cached tokens are free or exempt from rate limits.
+- `avoided_input_tokens_estimate` and `avoided_output_tokens_estimate`: previous successful request usage counted for an exact-replay cache hit. **Counterfactual**, not direct billing evidence.
+- `requests.hit`: count of opt-in replay hits. A hit rate of 80% does not imply 80% bill savings or extended 5-hour subscription limits.
 
-```python
-from scripts.cache80 import ExactCache, key_for
+## Provider details
 
-cache = ExactCache(".cooooost/cache", ttl=3600)
-messages = [{"role": "user", "content": "Explain this stable input"}]
-key = key_for("provider", "model-id", "system prompt", messages,
-              parameters={"temperature": 0}, namespace="project")
-answer = cache.get(key)
-if answer is None:
-    answer = call_your_provider(messages)
-    cache.put(key, answer)
-```
+[OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching) is enabled by default on supported models and reports usage details such as `cached_tokens`. Caching eligibility and discounts vary by model and endpoint. [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) supports configurable cache control, subject to model limits. Cooooost relays provider cache controls without rewriting them. Its local replay cannot control provider KV-cache lifecycle.
 
-The `call_your_provider` symbol represents an application-provided API adapter; this repository does not bundle an API client.
+## Default denials
 
-## Future milestones
-1. Provider-specific prompt-cache adapters and usage measurements.
-2. Claude Code hook integration with tested lifecycle handling.
-3. Dependency graph for incremental repository context retrieval.
-4. Privacy-aware eviction, cache metrics and adaptive policies.
-5. Benchmarks with task-level correctness regression gates.
+No replay for streaming responses, tools/function calling, external data toggles, missing explicit `temperature: 0`, absent model, malformed input, or disabled opt-in. No replay is performed by the skill installation itself; the client must explicitly point API requests to the local gateway.
+
+## Correctness and privacy notes
+
+Use replay for stable, read-only workloads where a previously generated response is acceptable. Avoid authentication, financial/medical decisions, searches, tool calls, personal secrets, and rapidly changing data. A changed prompt always hashes to a new key. Cache corruption/expiry produces a miss. Disable with header removal or call `purge-cache` to remove stored replies. The API gateway binds to localhost only. Its SQLite cache is stored locally, not committed.
