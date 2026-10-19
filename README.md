@@ -101,3 +101,9 @@ Tests exercise real local HTTP forwarding, response replay, isolation between AP
 See [Architecture](docs/ARCHITECTURE.md), [Cache 80](docs/CACHE80.md), and [Security](docs/SECURITY.md).
 
 MIT License.
+## Instructions for AI agents
+
+- [Universal agent runbook (AGENTS.md)](AGENTS.md) — English, agent-readable installation, recovery, hooks and cache policy.
+- [Полное руководство для ИИ-агентов на русском](docs/AGENT_INSTALLATION.ru.md) — установка на Windows/Linux/macOS, безопасная настройка, использование Cache 80 и критерии проверки.
+
+Agents must verify the environment and use the documented CLI rather than assuming all integrations are automatic.
